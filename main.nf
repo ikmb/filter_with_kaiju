@@ -215,8 +215,6 @@ process quality_check {
 
 	scratch true 
 	
-	//cpus 4
-	//memory '16 GB'
 	
     input:
     tuple val(sample), file(fastq_1), file(fastq_2)
@@ -265,9 +263,6 @@ process classify {
     conda 'bioconda::kaiju=1.8.2 conda-forge::libstdcxx-ng=11.2.0'
 
 	scratch true 
-	
-    //cpus 16
-	//memory '120 GB'
 	
     input:
     tuple val(sample), path(reads)
@@ -327,10 +322,6 @@ process extract_sequences {
 	
 	scratch true 
 		
-	cpus 1
-	
-	memory '4 GB'
-
     input:
     tuple val(sample), path(kaiju_out_keep), file(fastq_1), file(fastq_2)
     
