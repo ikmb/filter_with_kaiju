@@ -5,7 +5,7 @@ nextflow.enable.dsl=2
 
 /**
 ===============================
-Filter with kaiju pipeline
+Filter with kaiju pipeline - version ${workflow.manifest.version}
 ===============================
 
 This Pipeline uses taxonomic classification by Kaiju (Menzel, P. et al.) to filter input fastq.gz sequences.
@@ -85,7 +85,7 @@ workflow.onComplete {
 
     // Check if kaiju database is there
 if (params.kaiju_db) {
-   kaiju_db_fmi = file(params.kaiju_db + "/kaiju_db_*.fmi")
+   kaiju_db_fmi = file(params.kaiju_db + "/kaiju_db*.fmi")
    kaiju_db_nodes = file(params.kaiju_db + "/nodes.dmp")
 	
     if (!kaiju_db_nodes.exists()) {
@@ -104,15 +104,12 @@ if (params.kaiju_db) {
 
 // Define processes
 
-
 process quality_check {
 
     label 'fastp'
 
 	publishDir "${params.outdir}/fastp", mode: 'copy'
 	
-	conda 'bioconda::fastp=0.12.4'
-
 	scratch true 
 	
 	
@@ -160,16 +157,14 @@ process quality_check {
 process classify {
     label 'kaiju'
     
-    conda 'bioconda::kaiju=1.8.2 conda-forge::libstdcxx-ng=11.2.0'
-
-	scratch true 
+    scratch true 
 	
     input:
     tuple val(sample), path(reads)
     
     output: 
-    tuple val(sample), file(kaiju_out_keep)
-    
+    tuple val(sample), path(kaiju_out_keep)
+    path kaiju_out 	    
     
     script:
     kaiju_out = sample + ".kaiju.out"
@@ -218,8 +213,6 @@ process extract_sequences {
 
 	publishDir "${params.outdir}/seqtk", mode: 'copy'
 
-	conda 'bioconda::seqtk=1.3'
-	
 	scratch true 
 		
     input:
@@ -294,6 +287,24 @@ process store_kaiju {
     """ 
 }
 
+process multiqc {
+	label 'multiqc'
+
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+
+	input:
+	path reports
+
+	output:
+	path "multiqc_report.html"
+
+	script:
+	
+	"""
+		multiqc . 
+	"""
+
+}
 
 // Start workflow
 workflow {
@@ -307,8 +318,9 @@ workflow {
 
     quality_check(samples_ch)
     classify(quality_check.out)
-    extract_sequences(classify.out.join(samples_ch, by: [0]))
-    store_kaiju(classify.out) 
+    extract_sequences(classify.out[0].join(samples_ch, by: [0]))
+    store_kaiju(classify.out[0]) 
+    multiqc(classify.out[1].collect())
 }
 
 
