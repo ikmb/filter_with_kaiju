@@ -115,7 +115,7 @@ process version_seqtk {
 	script:
 
 	"""
-		seqktk &> v_seqtk.txt || true
+		seqtk &> v_seqtk.txt || true
 	"""
 
 }
@@ -132,6 +132,21 @@ process version_kaiju {
 	"""
 		kaiju &> v_kaiju.txt || true
 	"""
+
+}
+
+process version_fastp {
+
+        label 'fastp'
+
+        output:
+        path "v_fastp.txt"
+
+        script:
+
+        """
+                fastp -v 2> v_fastp.txt || true
+        """
 
 }
 
@@ -367,7 +382,8 @@ workflow {
 
     version_seqtk()
     version_kaiju()
-    versions(version_seqtk.out.concat(version_kaiju.out).collect())
+    version_fastp()
+    versions(version_seqtk.out.concat(version_kaiju.out,version_fastp.out).collect())
     quality_check(samples_ch)
     classify(quality_check.out)
     extract_sequences(classify.out[0].join(samples_ch, by: [0]))

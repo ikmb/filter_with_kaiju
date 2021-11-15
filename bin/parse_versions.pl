@@ -60,7 +60,10 @@ while (my $file = readdir(DIR)) {
 		my $line = @lines[2];
 		$tool = "SeqTK" ;
 		$version = (split " ", $line)[-1];
-		
+	} elsif ($file =~ /^v_fastp\.txt$/) {
+                my $line = @lines[0];
+                $tool = "fastP";
+                $version = (split " ", $line)[-1];	
 	} elsif ($file =~ /^v_nextflow\.txt$/ )  {
 		my $line = @lines[0];
 		$tool = "Nextflow";
