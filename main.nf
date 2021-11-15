@@ -104,6 +104,53 @@ if (params.kaiju_db) {
 
 // Define processes
 
+process version_seqtk {
+
+	label 'seqtk'
+
+	output:
+
+	path "v_seqtk.txt"
+
+	script:
+
+	"""
+		seqktk &> v_seqtk.txt || true
+	"""
+
+}
+
+process version_kaiju {
+
+	label 'kaiju'
+
+	output:
+	path "v_kaiju.txt"
+
+	script:
+
+	"""
+		kaiju &> v_kaiju.txt || true
+	"""
+
+}
+
+process versions {
+
+	input:
+	path '*'
+
+	output:
+	path "software_versions_mqc.yaml"
+
+	script:
+
+	"""
+		parse_versions.pl > software_versions_mqc.yaml
+	"""
+
+}
+
 process quality_check {
 
     label 'fastp'
@@ -177,9 +224,10 @@ process classify {
         r2 = sample + "*.qc.R2.fq.gz"
                 
         """
+
         kaiju \
         -t ${params.kaiju_db}/nodes.dmp \
-        -f ${params.kaiju_db}/kaiju_db_*.fmi \
+        -f ${params.kaiju_db}/kaiju_db*.fmi \
         -i $r1 \
         -j $r2 \
         -o $kaiju_out \
@@ -187,6 +235,7 @@ process classify {
         -v
 
         grep "^$params.keep" $kaiju_out > $kaiju_out_keep
+
         """ 
 
         }
@@ -197,7 +246,7 @@ process classify {
         """
         kaiju \
         -t ${params.kaiju_db}/nodes.dmp \
-        -f ${params.kaiju_db}/kaiju_db_*.fmi \
+        -f ${params.kaiju_db}/kaiju_db*.fmi \
         -i $r1 \
         -o $kaiju_out \
         -z ${task.cpus} \
@@ -294,6 +343,7 @@ process multiqc {
 
 	input:
 	path reports
+	path software_versions
 
 	output:
 	path "multiqc_report.html"
@@ -315,12 +365,14 @@ workflow {
         .map{ row -> tuple(row.sample, file(row.fastq_1), file(row.fastq_2)) }
         .set { samples_ch}
 
-
+    version_seqtk()
+    version_kaiju()
+    versions(version_seqtk.out.concat(version_kaiju.out).collect())
     quality_check(samples_ch)
     classify(quality_check.out)
     extract_sequences(classify.out[0].join(samples_ch, by: [0]))
     store_kaiju(classify.out[0]) 
-    multiqc(classify.out[1].collect())
+    multiqc(classify.out[1].collect(), versions.out.collect())
 }
 
 

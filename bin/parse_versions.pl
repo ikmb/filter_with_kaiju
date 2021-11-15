@@ -56,26 +56,22 @@ while (my $file = readdir(DIR)) {
 	
 	chomp(my @lines = <$IN>);	
 	
-	if ($file =~ /v_gatk.*/) {
-		my $line = @lines[0];
-		$tool = "GATK4" ;
+	if ($file =~ /v_seqtk.*/) {
+		my $line = @lines[2];
+		$tool = "SeqTK" ;
 		$version = (split " ", $line)[-1];
 		
 	} elsif ($file =~ /^v_nextflow\.txt$/ )  {
 		my $line = @lines[0];
 		$tool = "Nextflow";
 		$version = $line;
-	} elsif ($file =~ /^v_ikmb_exoseq\.txt$/) {
+	} elsif ($file =~ /^v_filter_with_kaiju\.txt$/) {
 		my $line = @lines[0];
-                $tool = "Exome Pipeline";
+                $tool = "Kaiju Pipeline";
 		$version = $line;
-	} elsif ($file =~ /^v_picard\.txt/) {
-		my $line = @lines[0];
-                $tool = "Picard";
-                $version = (split " ", $line)[-1];
-	} elsif ($file =~ /^v_bwa\.txt/) {
+	} elsif ($file =~ /^v_kaiju\.txt/) {
 		my $line = @lines[2];
-                $tool = "BWA";
+                $tool = "Kaiju";
                 $version = (split " ", $line)[-1];
 	} else {
 		my $line = @lines[0];
