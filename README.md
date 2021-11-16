@@ -11,7 +11,6 @@ This pipeline does not contain novel algorithms. These are based on the followin
 - [fastp](https://github.com/OpenGene/fastp)
 - [kaiju](https://kaiju.binf.ku.dk/)
 - [seqtk](https://github.com/lh3/seqtk)
-- 
 
 ## Documentation 
 
