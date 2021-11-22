@@ -5,7 +5,7 @@ nextflow.enable.dsl=2
 
 /**
 ===============================
-Filter with kaiju pipeline
+Filter with kaiju pipeline - version ${workflow.manifest.version}
 ===============================
 
 This Pipeline uses taxonomic classification by Kaiju (Menzel, P. et al.) to filter input fastq.gz sequences.
@@ -85,7 +85,7 @@ workflow.onComplete {
 
     // Check if kaiju database is there
 if (params.kaiju_db) {
-   kaiju_db_fmi = file(params.kaiju_db + "/kaiju_db_*.fmi")
+   kaiju_db_fmi = file(params.kaiju_db + "/kaiju_db*.fmi")
    kaiju_db_nodes = file(params.kaiju_db + "/nodes.dmp")
 	
     if (!kaiju_db_nodes.exists()) {
@@ -104,6 +104,67 @@ if (params.kaiju_db) {
 
 // Define processes
 
+process version_seqtk {
+
+	label 'seqtk'
+
+	output:
+
+	path "v_seqtk.txt"
+
+	script:
+
+	"""
+		seqtk &> v_seqtk.txt || true
+	"""
+
+}
+
+process version_kaiju {
+
+	label 'kaiju'
+
+	output:
+	path "v_kaiju.txt"
+
+	script:
+
+	"""
+		kaiju &> v_kaiju.txt || true
+	"""
+
+}
+
+process version_fastp {
+
+        label 'fastp'
+
+        output:
+        path "v_fastp.txt"
+
+        script:
+
+        """
+                fastp -v 2> v_fastp.txt || true
+        """
+
+}
+
+process versions {
+
+	input:
+	path '*'
+
+	output:
+	path "software_versions_mqc.yaml"
+
+	script:
+
+	"""
+		parse_versions.pl > software_versions_mqc.yaml
+	"""
+
+}
 
 process quality_check {
 
@@ -111,8 +172,6 @@ process quality_check {
 
 	publishDir "${params.outdir}/fastp", mode: 'copy'
 	
-	conda 'bioconda::fastp=0.12.4'
-
 	scratch true 
 	
 	
@@ -160,16 +219,14 @@ process quality_check {
 process classify {
     label 'kaiju'
     
-    conda 'bioconda::kaiju=1.8.2 conda-forge::libstdcxx-ng=11.2.0'
-
-	scratch true 
+    scratch true 
 	
     input:
     tuple val(sample), path(reads)
     
     output: 
-    tuple val(sample), file(kaiju_out_keep)
-    
+    tuple val(sample), path(kaiju_out_keep)
+    path kaiju_out 	    
     
     script:
     kaiju_out = sample + ".kaiju.out"
@@ -182,9 +239,10 @@ process classify {
         r2 = sample + "*.qc.R2.fq.gz"
                 
         """
+
         kaiju \
         -t ${params.kaiju_db}/nodes.dmp \
-        -f ${params.kaiju_db}/kaiju_db_*.fmi \
+        -f ${params.kaiju_db}/kaiju_db*.fmi \
         -i $r1 \
         -j $r2 \
         -o $kaiju_out \
@@ -192,6 +250,7 @@ process classify {
         -v
 
         grep "^$params.keep" $kaiju_out > $kaiju_out_keep
+
         """ 
 
         }
@@ -202,7 +261,7 @@ process classify {
         """
         kaiju \
         -t ${params.kaiju_db}/nodes.dmp \
-        -f ${params.kaiju_db}/kaiju_db_*.fmi \
+        -f ${params.kaiju_db}/kaiju_db*.fmi \
         -i $r1 \
         -o $kaiju_out \
         -z ${task.cpus} \
@@ -218,8 +277,6 @@ process extract_sequences {
 
 	publishDir "${params.outdir}/seqtk", mode: 'copy'
 
-	conda 'bioconda::seqtk=1.3'
-	
 	scratch true 
 		
     input:
@@ -294,6 +351,25 @@ process store_kaiju {
     """ 
 }
 
+process multiqc {
+	label 'multiqc'
+
+	publishDir "${params.outdir}/MultiQC", mode: 'copy'
+
+	input:
+	path reports
+	path software_versions
+
+	output:
+	path "multiqc_report.html"
+
+	script:
+	
+	"""
+		multiqc . 
+	"""
+
+}
 
 // Start workflow
 workflow {
@@ -304,11 +380,15 @@ workflow {
         .map{ row -> tuple(row.sample, file(row.fastq_1), file(row.fastq_2)) }
         .set { samples_ch}
 
-
+    version_seqtk()
+    version_kaiju()
+    version_fastp()
+    versions(version_seqtk.out.concat(version_kaiju.out,version_fastp.out).collect())
     quality_check(samples_ch)
     classify(quality_check.out)
-    extract_sequences(classify.out.join(samples_ch, by: [0]))
-    store_kaiju(classify.out) 
+    extract_sequences(classify.out[0].join(samples_ch, by: [0]))
+    store_kaiju(classify.out[0]) 
+    multiqc(classify.out[1].collect(), versions.out.collect())
 }
 
 
